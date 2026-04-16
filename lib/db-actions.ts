@@ -1,6 +1,6 @@
 import { db } from './db';
-import { stories, pages, type Story, type Page } from './schema';
-import { eq } from 'drizzle-orm';
+import { stories, pages, feedback, type Story, type Page, type Feedback } from './schema';
+import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import { generateComicSlug } from './slug-generator';
 
 export async function createStory(data: { title: string; description?: string; userId: string; style?: string; usesOwnApiKey?: boolean }): Promise<Story> {
@@ -149,4 +149,18 @@ export async function deletePage(pageId: string): Promise<void> {
 
 export async function deleteStory(storyId: string): Promise<void> {
   await db.delete(stories).where(eq(stories.id, storyId));
+}
+
+export async function createFeedback(data: { message: string; userId?: string }): Promise<Feedback> {
+  const [entry] = await db.insert(feedback).values(data).returning();
+  return entry;
+}
+
+export async function getPagesGeneratedLast24Hours(): Promise<number> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pages)
+    .where(and(isNotNull(pages.generatedImageUrl), gte(pages.createdAt, since)));
+  return row?.count ?? 0;
 }

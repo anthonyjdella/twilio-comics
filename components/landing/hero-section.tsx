@@ -1,8 +1,31 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { TOGETHER_LINK } from "@/lib/utils";
 
 export function LandingHero() {
+  const [pagesLast24h, setPagesLast24h] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/stats")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.pagesLast24h === "number") {
+          setPagesLast24h(data.pagesLast24h);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const roundedCount =
+    pagesLast24h !== null && pagesLast24h >= 10
+      ? Math.floor(pagesLast24h / 10) * 10
+      : null;
+
   return (
     <header className="relative py-8 sm:py-12 md:py-16 lg:py-0">
       <div className="relative z-10">
@@ -28,6 +51,16 @@ export function LandingHero() {
             Describe your scene, choose a style, and let AI render professional
             comic panels instantly.
           </p>
+
+          {roundedCount !== null && (
+            <p className="text-muted-foreground leading-relaxed max-w-md mx-auto lg:mx-0 tracking-[-0.02em] px-4 sm:px-0 text-sm mt-2">
+              More than{" "}
+              <span className="text-indigo font-semibold">
+                {roundedCount.toLocaleString()}
+              </span>{" "}
+              comic pages have been generated in the last 24 hours.
+            </p>
+          )}
         </div>
       </div>
     </header>

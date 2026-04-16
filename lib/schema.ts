@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, uuid, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, uuid, jsonb, boolean, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Stories table
@@ -38,7 +38,18 @@ export const pagesRelations = relations(pages, ({ one }) => ({
   }),
 }));
 
+// Feedback table
+export const feedback = pgTable('feedback', {
+  id: serial('id').primaryKey(),
+  message: text('message').notNull(),
+  userId: text('user_id'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Types
+export type Feedback = typeof feedback.$inferSelect;
+export type NewFeedback = typeof feedback.$inferInsert;
+
 export type Story = typeof stories.$inferSelect;
 export type NewStory = typeof stories.$inferInsert;
 
