@@ -1,0 +1,13 @@
+allowBuilds:
+  '@clerk/shared': true
+  core-js: true
+  esbuild: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@aws-sdk/client-s3@3.1070.0'
+  - lucide-react@1.20.0
+overrides:
+  fast-xml-parser: '>=5.3.6'
+  dompurify: '>=3.3.2'
+  lodash: '>=4.17.24'
+  postcss: '>=8.5.10'

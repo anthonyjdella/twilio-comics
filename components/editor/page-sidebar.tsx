@@ -2,7 +2,7 @@
 
 import { Plus, Loader2, Key, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UserButton, SignedIn } from "@clerk/nextjs";
+import { UserButton, Show } from "@clerk/nextjs";
 
 interface PageData {
   id: number;
@@ -103,7 +103,7 @@ export function PageSidebar({
           <Key className="w-4 h-4" />
         </Button>
 
-        <SignedIn>
+        <Show when="signed-in">
           <div className="w-10 h-10 glass-panel glass-panel-hover rounded-md flex items-center justify-center text-muted-foreground hover:text-white transition-colors">
             <UserButton
               appearance={{
@@ -113,7 +113,7 @@ export function PageSidebar({
               }}
             />
           </div>
-        </SignedIn>
+        </Show>
       </div>
     </aside>
   );

@@ -49,7 +49,10 @@ export default function RootLayout({
         className={`${inter.variable} ${bangers.variable} ${spaceGrotesk.variable} ${instrumentSerif.variable}`}
       >
         <head>
-          <PlausibleProvider domain="makecomics.io" />
+          <PlausibleProvider
+            src="https://plausible.io/js/script.js"
+            scriptProps={{ "data-domain": "makecomics.io" }}
+          />
         </head>
         <body className="font-sans antialiased">
           {children}

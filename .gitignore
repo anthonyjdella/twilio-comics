@@ -27,3 +27,4 @@ next-env.d.ts
 /.clerk/
 
 .DS_Store
+IDEAS.md
