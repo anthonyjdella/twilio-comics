@@ -2,7 +2,8 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Key, ExternalLink, ArrowRight, X } from "lucide-react"
+import { Key, ExternalLink, ArrowRight, X, Check } from "lucide-react"
+import { motion, AnimatePresence } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -24,10 +25,15 @@ interface ApiKeyModalProps {
 export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [shakeKey, setShakeKey] = useState(0)
+  const [success, setSuccess] = useState(false)
   const [existingKey, setApiKey] = useApiKey()
 
   useEffect(() => {
     if (isOpen) {
+      setSuccess(false)
+      setError(null)
       setApiKeyInput((current) => {
         if (existingKey && current === "") {
           return existingKey
@@ -42,98 +48,179 @@ export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
     if (!apiKeyInput.trim()) return
 
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    setError(null)
+
+    try {
+      const res = await fetch("/api/validate-api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+      })
+      const data = await res.json()
+
+      if (!data.valid) {
+        setError("Invalid API key. Please check and try again.")
+        setShakeKey((k) => k + 1)
+        setIsLoading(false)
+        return
+      }
+    } catch {
+      setError("Could not validate key. Please try again.")
+      setShakeKey((k) => k + 1)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(false)
+    setSuccess(true)
     onSubmit(apiKeyInput.trim())
-    setApiKeyInput("")
+    setTimeout(() => {
+      setSuccess(false)
+      setApiKeyInput("")
+    }, 1400)
   }
 
   const handleDelete = () => {
     setApiKey(null)
     setApiKeyInput("")
+    setError(null)
     onClose()
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="border border-border/50 rounded-lg bg-background max-w-md">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <div className="w-14 h-14 glass-panel rounded-full flex items-center justify-center">
-              <Key className="w-6 h-6 text-indigo" />
-            </div>
+      <DialogContent className="border border-border/50 rounded-xl bg-background max-w-sm p-6 overflow-hidden">
+        <AnimatePresence>
+          {success && (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background rounded-xl"
+            >
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.05 }}
+                className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center"
+              >
+                <Check className="w-7 h-7 text-emerald-400" strokeWidth={2.5} />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.2 }}
+                className="text-sm font-medium text-white"
+              >
+                API key saved
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.2 }}
+                className="text-xs text-muted-foreground"
+              >
+                You're all set for unlimited generation
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <DialogHeader className="mb-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Key className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <DialogTitle className="text-base font-semibold text-white leading-none">
+              {existingKey ? "Your API key" : "Add your API key"}
+            </DialogTitle>
           </div>
-
-          <DialogTitle className="text-xl text-center text-white">
+          <DialogDescription className="text-sm text-muted-foreground leading-snug pl-6">
             {existingKey
-              ? "Update your API key"
-              : "Add your API key to continue"}
-          </DialogTitle>
-
-          <DialogDescription className="text-center text-muted-foreground">
-            {existingKey
-              ? "Update your Together API key or add a new one. You can also delete your existing key."
-              : "You've used all your weekly credits! Add your Together API key for unlimited generation."}
+              ? "Update or remove your Together AI key."
+              : "You've used all your free credits. Add your key for unlimited use."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="relative">
-            <Input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder={
-                existingKey ? "Your current API key" : "Enter your API key..."
-              }
-              className="bg-secondary border-border/50 text-white placeholder-muted-foreground py-5 pr-10"
-            />
-            {apiKeyInput && (
-              <button
-                type="button"
-                onClick={() => setApiKeyInput("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  key="error"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="absolute bottom-full left-0 mb-1.5 text-xs text-red-400 flex items-center gap-1.5 pointer-events-none"
+                >
+                  <span className="inline-block w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <motion.div
+              key={shakeKey}
+              className="relative"
+              animate={shakeKey > 0 ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+              transition={{ duration: 0.45, ease: "easeInOut" }}
+            >
+              <Input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => { setApiKeyInput(e.target.value); setError(null) }}
+                placeholder="sk-••••••••••••••••"
+                className={`bg-secondary border-border/50 text-white placeholder-muted-foreground/40 py-5 pr-10 font-mono text-sm transition-colors duration-200 ${error ? "border-red-500/60 focus-visible:ring-red-500/20" : ""}`}
+              />
+              {apiKeyInput && (
+                <button
+                  type="button"
+                  onClick={() => setApiKeyInput("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </motion.div>
           </div>
 
           <a
             href={TOGETHER_LINK}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-indigo hover:text-indigo-light flex items-center gap-1.5 transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
           >
-            Get your Together API key
-            <ExternalLink className="h-3.5 w-3.5" />
+            Get a free Together AI key
+            <ExternalLink className="h-3 w-3" />
           </a>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-2 pt-1">
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               onClick={existingKey ? handleDelete : onClose}
-              className="flex-1 text-muted-foreground hover:text-white hover:bg-secondary"
+              className={`flex-1 border-border/50 hover:border-border transition-colors ${
+                existingKey
+                  ? "text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-300"
+                  : "text-muted-foreground hover:text-white hover:bg-secondary"
+              }`}
             >
-              {existingKey ? "Delete API Key" : "Maybe Later"}
+              {existingKey ? "Delete" : "Later"}
             </Button>
             <Button
               type="submit"
               disabled={!apiKeyInput.trim() || isLoading}
-              className="flex-1 gap-2 bg-white hover:bg-neutral-200 text-black"
+              className="flex-[2] gap-2 bg-white hover:bg-neutral-200 text-black font-medium"
             >
-              {isLoading ? "Validating..." : "Continue"}
-              <ArrowRight className="w-4 h-4" />
+              {isLoading ? "Checking…" : "Save key"}
+              {!isLoading && <ArrowRight className="w-4 h-4" />}
             </Button>
           </div>
-        </form>
 
-        <div className="mt-4 p-3 glass-panel rounded-lg">
-          <p className="text-xs text-muted-foreground text-center">
-            Your API key is stored locally and never stored on our servers.
+          <p className="text-xs text-muted-foreground/50 text-center pt-1">
+            Stored locally · never sent to our servers
           </p>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

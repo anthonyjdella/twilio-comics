@@ -31,7 +31,7 @@ const FIXED_DIMENSIONS = NEW_MODEL
   ? { width: 896, height: 1200 }
   : { width: 864, height: 1184 };
 
-const TEXT_MODEL = "Qwen/Qwen3-Next-80B-A3B-Instruct";
+const TEXT_MODEL = "Qwen/Qwen3.5-9B";
 
 export async function POST(request: NextRequest) {
   try {
