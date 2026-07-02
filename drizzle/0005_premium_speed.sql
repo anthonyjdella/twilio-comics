@@ -10,12 +10,4 @@ CREATE TABLE "conversations" (
 	CONSTRAINT "conversations_phone_number_unique" UNIQUE("phone_number")
 );
 --> statement-breakpoint
-CREATE TABLE "feedback" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"message" text NOT NULL,
-	"user_id" text,
-	"created_at" timestamp DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-ALTER TABLE "stories" ADD COLUMN "source" text DEFAULT 'web' NOT NULL;--> statement-breakpoint
-ALTER TABLE "stories" ADD COLUMN "uses_own_api_key" boolean DEFAULT false;
+ALTER TABLE "stories" ADD COLUMN "source" text DEFAULT 'web' NOT NULL;
