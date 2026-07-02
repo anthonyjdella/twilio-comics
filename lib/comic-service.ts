@@ -36,6 +36,7 @@ export interface CreateComicArgs {
   characterImageUrls?: string[];
   source: "web" | "sms" | "voice";
   generateTitle?: boolean;
+  usesOwnApiKey?: boolean;
 }
 
 export interface CreateComicResult {
@@ -118,6 +119,7 @@ export async function createComicStory({
   characterImageUrls = [],
   source,
   generateTitle = true,
+  usesOwnApiKey = false,
 }: CreateComicArgs): Promise<CreateComicResult> {
   const fallbackTitle =
     prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt;
@@ -128,6 +130,7 @@ export async function createComicStory({
     userId,
     style,
     source,
+    usesOwnApiKey,
   });
 
   const page = await createPage({

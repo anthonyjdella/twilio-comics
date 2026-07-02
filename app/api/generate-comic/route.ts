@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
           characterImageUrls: characterImages,
           source: "web",
           generateTitle: true,
+          usesOwnApiKey: !!apiKey,
         });
         return NextResponse.json({
           imageUrl: result.imageUrl,
