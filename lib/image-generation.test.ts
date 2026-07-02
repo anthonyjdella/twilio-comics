@@ -10,8 +10,6 @@ vi.mock("openai", () => {
   function OpenAI() {
     return { images: { generate: generateMock, edit: editMock } };
   }
-  // @ts-expect-error attach static toFile like the real SDK
-  OpenAI.toFile = toFileMock;
   return { default: OpenAI, toFile: toFileMock };
 });
 
@@ -39,7 +37,10 @@ describe("generateComicImage", () => {
     expect(editMock).not.toHaveBeenCalled();
     const arg = generateMock.mock.calls[0][0];
     expect(arg.model).toBe("gpt-image-2");
+    expect(arg.size).toBe("1024x1536");
     expect(arg.size).toBe(IMAGE_SIZE);
+    expect(arg.quality).toBe("high");
+    expect(arg).not.toHaveProperty("response_format");
     expect(arg).not.toHaveProperty("temperature");
     expect(out).toBeInstanceOf(Buffer);
     expect(out.toString()).toBe("fake-png-bytes");
@@ -53,6 +54,7 @@ describe("generateComicImage", () => {
     expect(arg.model).toBe("gpt-image-2");
     expect(Array.isArray(arg.image)).toBe(true);
     expect(arg.image).toHaveLength(2);
+    expect(arg.quality).toBe("high");
     expect(arg.input_fidelity).toBe("high");
   });
 

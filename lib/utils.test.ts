@@ -11,6 +11,7 @@ describe("isContentPolicyViolation", () => {
     expect(isContentPolicyViolation("Your request was rejected as a result of our safety system")).toBe(true);
     expect(isContentPolicyViolation("This request may violate our content policy")).toBe(true);
     expect(isContentPolicyViolation("moderation_blocked")).toBe(true);
+    expect(isContentPolicyViolation("CONTENT_POLICY_VIOLATION")).toBe(true);
   });
 
   it("returns false for unrelated errors", () => {
