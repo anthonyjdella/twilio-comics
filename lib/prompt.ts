@@ -1,9 +1,9 @@
 import { COMIC_STYLES } from "./constants";
 
-// Together AI has a 45000 character limit for the prompt parameter
-// We use 40k total to keep a larger safety margin
-export const MAX_PROMPT_LENGTH = 40000;
-export const MAX_SYSTEM_LENGTH = 35000; // Reserve 5,000 for user's prompt
+// OpenAI gpt-image-2 has a 32,000 character limit for the prompt parameter
+// We use 30k total to keep a safety margin below that cap
+export const MAX_PROMPT_LENGTH = 30000;
+export const MAX_SYSTEM_LENGTH = 26000; // Reserve 4,000 for user's prompt
 
 export const MAX_USER_PROMPT = MAX_PROMPT_LENGTH - MAX_SYSTEM_LENGTH;
 

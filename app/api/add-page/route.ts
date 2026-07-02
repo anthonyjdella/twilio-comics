@@ -211,18 +211,15 @@ export async function POST(request: NextRequest) {
 
     await updatePage(page.id, s3ImageUrl);
 
-    // Apply rate limiting for free tier after successful generation
-    const hasApiKey = request.headers.get("x-api-key");
-    if (!hasApiKey) {
-      try {
-        await freeTierRateLimit.limit(userId);
-      } catch (rateLimitError) {
-        console.error(
-          "Error applying rate limit after successful generation:",
-          rateLimitError,
-        );
-        // Don't fail the request if rate limiting fails, just log it
-      }
+    // Apply rate limiting after successful generation (always server-funded)
+    try {
+      await freeTierRateLimit.limit(userId);
+    } catch (rateLimitError) {
+      console.error(
+        "Error applying rate limit after successful generation:",
+        rateLimitError,
+      );
+      // Don't fail the request if rate limiting fails, just log it
     }
 
     return NextResponse.json({

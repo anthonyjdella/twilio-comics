@@ -232,7 +232,7 @@ Only return the JSON, no other text.`;
       const durationSeconds = (durationMs / 1000).toFixed(2);
       console.log(`Image generation completed in ${durationSeconds} seconds`);
     } catch (error) {
-      console.error("Together AI API error:", error);
+      console.error("Image generation error:", error);
 
       // Clean up DB records if generation failed
       try {
@@ -338,17 +338,15 @@ Only return the JSON, no other text.`;
       );
     }
 
-    // Apply rate limiting for free tier after successful generation
-    if (isUsingFreeTier) {
-      try {
-        await freeTierRateLimit.limit(userId);
-      } catch (rateLimitError) {
-        console.error(
-          "Error applying rate limit after successful generation:",
-          rateLimitError,
-        );
-        // Don't fail the request if rate limiting fails, just log it
-      }
+    // Apply rate limiting after successful generation (always server-funded)
+    try {
+      await freeTierRateLimit.limit(userId);
+    } catch (rateLimitError) {
+      console.error(
+        "Error applying rate limit after successful generation:",
+        rateLimitError,
+      );
+      // Don't fail the request if rate limiting fails, just log it
     }
 
     const responseData = storyId

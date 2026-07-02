@@ -51,10 +51,10 @@ export async function GET(request: NextRequest) {
       if (i > 0) pdf.addPage();
 
       const imgBuffer = imageBuffers[i];
-      const imgData = `data:image/jpeg;base64,${imgBuffer.toString("base64")}`;
+      const imgData = `data:image/png;base64,${imgBuffer.toString("base64")}`;
 
       // For simplicity, assume images fit the page; in production you might want to scale
-      pdf.addImage(imgData, "JPEG", 10, 10, 190, 277); // A4 portrait size minus margins
+      pdf.addImage(imgData, "PNG", 10, 10, 190, 277); // A4 portrait size minus margins
 
       // Add "Created by Make Comics" at the bottom
       pdf.setFont("helvetica", "bold");
