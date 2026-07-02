@@ -24,7 +24,7 @@ export function handleVoiceTurn(session: VoiceSession, inbound: VoiceInbound): V
     case "awaiting_name": {
       if (!text) {
         return {
-          session,
+          session: { ...session },
           say: "Sorry, I didn't catch your name. What's your name?",
           action: "none",
         };
@@ -38,7 +38,7 @@ export function handleVoiceTurn(session: VoiceSession, inbound: VoiceInbound): V
     case "awaiting_prompt": {
       if (!text) {
         return {
-          session,
+          session: { ...session },
           say: "Tell me what the comic should be about.",
           action: "none",
         };
@@ -53,7 +53,7 @@ export function handleVoiceTurn(session: VoiceSession, inbound: VoiceInbound): V
     case "done":
     default: {
       return {
-        session,
+        session: { ...session },
         say: "Your comic is on its way by text. Goodbye!",
         endCall: true,
         action: "none",
