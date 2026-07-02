@@ -73,7 +73,7 @@ The SMS channel uses an **async, webhook-driven design**: the incoming SMS webho
 
 Call the Twilio number → a voice assistant asks your name and comic idea → the comic is generated and texted to you within ~1 minute.
 
-The phone call channel uses [**Twilio ConversationRelay**](https://www.twilio.com/docs/voice/conversational-ai/conversation-relay) to pipe live voice interactions through OpenAI's Realtime API, running on a dedicated persistent WebSocket server (see `voice-server/`).
+The phone call channel uses [**Twilio ConversationRelay**](https://www.twilio.com/docs/voice/conversational-ai/conversation-relay), which handles speech-to-text and text-to-speech, connected to a dedicated persistent WebSocket server (see `voice-server/`) that runs the scripted conversation. When the call finishes it enqueues the same comic-generation job as the SMS channel, so the finished comic is delivered by text.
 
 ### Setup checklist
 
