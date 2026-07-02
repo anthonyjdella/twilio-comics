@@ -8,6 +8,7 @@ export const stories = pgTable('stories', {
   slug: text('slug').notNull().unique(),
   description: text('description'),
   style: text('style').default('noir').notNull(),
+  source: text('source').default('web').notNull(),
   userId: text('user_id').notNull(),
   usesOwnApiKey: boolean('uses_own_api_key').default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -22,6 +23,21 @@ export const pages = pgTable('pages', {
   prompt: text('prompt').notNull(),
   characterImageUrls: jsonb('character_image_urls').$type<string[]>().default([]).notNull(),
   generatedImageUrl: text('generated_image_url'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Conversations table — SMS/Voice input state machine, keyed by phone number
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  phoneNumber: text('phone_number').notNull().unique(),
+  channel: text('channel').default('sms').notNull(),
+  state: text('state').default('awaiting_name').notNull(),
+  collected: jsonb('collected')
+    .$type<{ name?: string; prompt?: string; style?: string; characterImageUrls?: string[] }>()
+    .default({})
+    .notNull(),
+  activeStoryId: uuid('active_story_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -55,3 +71,6 @@ export type NewStory = typeof stories.$inferInsert;
 
 export type Page = typeof pages.$inferSelect;
 export type NewPage = typeof pages.$inferInsert;
+
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;

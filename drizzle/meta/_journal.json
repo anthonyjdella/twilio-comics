@@ -36,6 +36,13 @@
       "when": 1766745845651,
       "tag": "0004_real_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782980562553,
+      "tag": "0005_premium_speed",
+      "breakpoints": true
     }
   ]
 }
