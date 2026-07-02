@@ -69,6 +69,33 @@ The SMS channel uses an **async, webhook-driven design**: the incoming SMS webho
    - **Production**: Deploy to Vercel, Railway, or your preferred host.
    - **Local testing**: Use [ngrok](https://ngrok.com/) or similar: `ngrok http 3000`, then set `PUBLIC_BASE_URL=https://<your-ngrok-url>`.
 
+## Create comics by phone call
+
+Call the Twilio number → a voice assistant asks your name and comic idea → the comic is generated and texted to you within ~1 minute.
+
+The phone call channel uses [**Twilio ConversationRelay**](https://www.twilio.com/docs/voice/conversational-ai/conversation-relay) to pipe live voice interactions through OpenAI's Realtime API, running on a dedicated persistent WebSocket server (see `voice-server/`).
+
+### Setup checklist
+
+1. **Deploy the voice server** to a long-lived host (Fly.io, Railway, etc.):
+   - See [`voice-server/README.md`](./voice-server/README.md) for detailed instructions.
+   - Note the public `wss://` URL of your deployed server.
+
+2. **Set `CONVERSATION_RELAY_WS_URL`** to that URL:
+   - In the **Next.js app**: `.env` → `CONVERSATION_RELAY_WS_URL=wss://your-voice-server-url`
+   - In the **voice server**: `.env` / secrets → same URL
+
+3. **Configure the Twilio number's Voice webhook** in the [Twilio Console](https://console.twilio.com):
+   - **Webhook URL**: `<PUBLIC_BASE_URL>/api/twilio/voice` (HTTP POST)
+   - Replace `<PUBLIC_BASE_URL>` with your public HTTPS domain (no trailing slash; e.g., `https://myapp.example.com`).
+
+4. **⚠️ Accept the AI/ML Features Addendum** in the Twilio Console:
+   - Navigate to **Voice** → **Settings** → **Privacy & Security**
+   - Enable "AI/ML Features"
+   - **This is mandatory** — without it, ConversationRelay returns error 64110 "Account Opted Out" and calls fail.
+
+5. The same Twilio number, QStash, and OpenAI setup from the **SMS channel are reused** — no additional Twilio or API accounts needed.
+
 ## Cloning & running
 
 1. Clone the repo: `git clone https://github.com/nutlope/make-comics`
