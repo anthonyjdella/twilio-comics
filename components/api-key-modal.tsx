@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { TOGETHER_LINK } from "@/lib/utils"
+import { OPENAI_LINK } from "@/lib/utils"
 import { useApiKey } from "@/hooks/use-api-key"
 
 interface ApiKeyModalProps {
@@ -136,7 +136,7 @@ export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
           </div>
           <DialogDescription className="text-sm text-muted-foreground leading-snug pl-6">
             {existingKey
-              ? "Update or remove your Together AI key."
+              ? "Update or remove your OpenAI key."
               : "You've used all your free credits. Add your key for unlimited use."}
           </DialogDescription>
         </DialogHeader>
@@ -185,12 +185,12 @@ export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
           </div>
 
           <a
-            href={TOGETHER_LINK}
+            href={OPENAI_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
           >
-            Get a free Together AI key
+            Get an OpenAI API key
             <ExternalLink className="h-3 w-3" />
           </a>
 

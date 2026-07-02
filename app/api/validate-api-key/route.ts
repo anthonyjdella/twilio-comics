@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import Together from "together-ai";
+import OpenAI from "openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,19 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Dynamically fetch the fastest available model
-    const routerRes = await fetch("https://whichllm.together.ai/router/fast", {
-      next: { revalidate: 60 },
-    });
-    const { model } = await routerRes.json();
-
-    // Fire a minimal completion — 1 output token to keep cost/latency negligible
-    const client = new Together({ apiKey });
-    await client.chat.completions.create({
-      model,
-      messages: [{ role: "user", content: "hi" }],
-      max_tokens: 1,
-    });
+    // Cheap validating call: list models. Succeeds only for a valid key.
+    const client = new OpenAI({ apiKey });
+    await client.models.list();
 
     return NextResponse.json({ valid: true });
   } catch (error: unknown) {
