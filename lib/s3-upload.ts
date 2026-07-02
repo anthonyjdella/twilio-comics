@@ -44,3 +44,19 @@ export async function uploadImageToS3(
     throw new Error("Failed to upload image to S3");
   }
 }
+
+export async function uploadBufferToS3(
+  buffer: Buffer,
+  key: string,
+  contentType: string = "image/png",
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: process.env.S3_UPLOAD_BUCKET!,
+    Key: `comics/${key}`,
+    Body: buffer,
+    ContentType: contentType,
+    Metadata: { "app-name": "make-comics", type: "comic-page" },
+  });
+  await s3Client.send(command);
+  return `https://${process.env.S3_UPLOAD_BUCKET}.s3.${process.env.S3_UPLOAD_REGION}.amazonaws.com/comics/${key}`;
+}
