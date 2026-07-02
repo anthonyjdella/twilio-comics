@@ -49,6 +49,11 @@ server.on("upgrade", (req, socket, head) => {
 
 wss.on("connection", (ws) => {
   let session: Session = { step: "awaiting_name" };
+  // An unhandled 'error' event on a ws socket crashes the whole process
+  // (which would drop every other live call). Log and let the socket close.
+  ws.on("error", (err) => {
+    console.error("websocket error:", err);
+  });
   ws.on("message", async (raw) => {
     let msg: any;
     try {

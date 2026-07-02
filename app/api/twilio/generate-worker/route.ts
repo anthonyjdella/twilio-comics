@@ -12,6 +12,7 @@ async function handler(request: Request) {
     prompt: string;
     style?: string;
     characterImageUrls?: string[];
+    source?: "sms" | "voice";
   };
 
   if (!job?.phoneNumber || !job?.prompt) {
@@ -24,7 +25,7 @@ async function handler(request: Request) {
       prompt: job.prompt,
       style: job.style || "noir",
       characterImageUrls: job.characterImageUrls || [],
-      source: "sms",
+      source: job.source === "voice" ? "voice" : "sms",
       generateTitle: true,
     });
 
