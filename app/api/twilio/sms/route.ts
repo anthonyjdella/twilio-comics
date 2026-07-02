@@ -8,6 +8,7 @@ import { advanceConversation, type Collected, type ConversationState } from "@/l
 import { publishGenerationJob } from "@/lib/qstash";
 import { getOrCreateConversation, updateConversation } from "@/lib/db-actions";
 import { uploadBufferToS3 } from "@/lib/s3-upload";
+import { freeTierRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,22 @@ export async function POST(request: NextRequest) {
     });
 
     if (advance.action === "enqueue_generation" && mergedCollected.prompt) {
+      // Image generation is server-funded, so gate free-tier usage BEFORE
+      // spending budget. Peek at remaining credits (the worker's
+      // freeTierRateLimit.limit() does the single consume on success).
+      const { remaining } = await freeTierRateLimit.getRemaining(inbound.from);
+      if (remaining <= 0) {
+        // Roll back to awaiting_prompt so the user can retry after the window
+        // resets, instead of being stuck in the "generating" state.
+        await updateConversation(inbound.from, {
+          state: "awaiting_prompt",
+          collected: mergedCollected as Record<string, unknown>,
+        });
+        return twiml(
+          "You've reached the free limit of 3 comics this week. Please try again in a few days!",
+        );
+      }
+
       await publishGenerationJob({
         phoneNumber: inbound.from,
         prompt: mergedCollected.prompt,
