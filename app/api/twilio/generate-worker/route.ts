@@ -1,4 +1,4 @@
-import { verifySignatureAppRouter } from "@/lib/qstash";
+import { verifySignatureAppRouter } from "@/lib/qstash-nextjs";
 import { createComicStory, ComicServiceError } from "@/lib/comic-service";
 import { sendComicMms } from "@/lib/twilio";
 import { updateConversation, resetConversation } from "@/lib/db-actions";

@@ -1,8 +1,6 @@
 import { Client } from "@upstash/qstash";
 import { createHash } from "node:crypto";
 
-export { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
-
 export interface GenerationJob {
   phoneNumber: string;
   prompt: string;

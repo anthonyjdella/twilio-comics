@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
 
 // verifySignatureAppRouter becomes an identity pass-through so we can call
 // the handler directly without a real QStash signature.
-vi.mock("@/lib/qstash", () => ({
+vi.mock("@/lib/qstash-nextjs", () => ({
   verifySignatureAppRouter: (fn: (req: Request) => Promise<Response>) => fn,
 }));
 
