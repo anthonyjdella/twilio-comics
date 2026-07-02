@@ -1,0 +1,19 @@
+import { describe, it, expect } from "vitest";
+import { isContentPolicyViolation } from "@/lib/utils";
+
+describe("isContentPolicyViolation", () => {
+  it("matches existing Together phrasing", () => {
+    expect(isContentPolicyViolation("Invalid content detected")).toBe(true);
+    expect(isContentPolicyViolation("NO_IMAGE")).toBe(true);
+  });
+
+  it("matches OpenAI moderation phrasing", () => {
+    expect(isContentPolicyViolation("Your request was rejected as a result of our safety system")).toBe(true);
+    expect(isContentPolicyViolation("This request may violate our content policy")).toBe(true);
+    expect(isContentPolicyViolation("moderation_blocked")).toBe(true);
+  });
+
+  it("returns false for unrelated errors", () => {
+    expect(isContentPolicyViolation("connection timeout")).toBe(false);
+  });
+});
