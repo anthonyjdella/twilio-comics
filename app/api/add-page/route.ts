@@ -146,22 +146,15 @@ export async function POST(request: NextRequest) {
       const durationSeconds = (durationMs / 1000).toFixed(2);
       console.log(`Image generation completed in ${durationSeconds} seconds`);
     } catch (error) {
-      console.error("Together AI API error:", error);
+      console.error("Image generation error:", error);
 
-      // Clean up DB records if generation failed due to content policy
+      // Clean up DB records if generation failed
       try {
-        if (
-          error instanceof Error &&
-          error.message &&
-          error.message.includes("NO_IMAGE")
-        ) {
-          if (isRedraw) {
-            // For redraw, we don't delete the page, just don't update it
-          } else {
-            // For new page, delete the page that was created
-            await deletePage(page.id);
-          }
+        if (!isRedraw) {
+          // For new page, delete the page that was created
+          await deletePage(page.id);
         }
+        // For redraw, we don't delete the page, just don't update it
       } catch (cleanupError) {
         console.error(
           "Error cleaning up DB on image generation failure:",
