@@ -35,10 +35,17 @@ async function handler(request: Request) {
       mediaUrl: result.imageUrl,
     });
 
-    await updateConversation(job.phoneNumber, {
-      state: "done",
-      activeStoryId: result.story.id,
-    });
+    // Bookkeeping is non-fatal: the comic is already generated and delivered.
+    // A DB blip here must NOT escalate to a 500, which would make QStash retry
+    // and regenerate (and re-charge) a second comic.
+    try {
+      await updateConversation(job.phoneNumber, {
+        state: "done",
+        activeStoryId: result.story.id,
+      });
+    } catch (bookkeepingErr) {
+      console.error("Failed to mark conversation done:", bookkeepingErr);
+    }
     return Response.json({ ok: true });
   } catch (error) {
     let message =
@@ -60,7 +67,13 @@ async function handler(request: Request) {
     } catch (smsErr) {
       console.error("Failed to send failure SMS:", smsErr);
     }
-    await resetConversation(job.phoneNumber);
+    // Non-fatal: a reset failure must not escalate to a 500 → QStash retry →
+    // duplicate (re-charged) generation. We've already notified the user.
+    try {
+      await resetConversation(job.phoneNumber);
+    } catch (resetErr) {
+      console.error("Failed to reset conversation after failure:", resetErr);
+    }
     // Return 200: we've already notified the user; no value in a QStash retry.
     return Response.json({ ok: false, handled: true });
   }
