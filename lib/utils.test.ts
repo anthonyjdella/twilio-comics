@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { isContentPolicyViolation } from "@/lib/utils";
 
 describe("isContentPolicyViolation", () => {
-  it("matches existing Together phrasing", () => {
+  it("matches legacy image-provider phrasing", () => {
     expect(isContentPolicyViolation("Invalid content detected")).toBe(true);
     expect(isContentPolicyViolation("NO_IMAGE")).toBe(true);
   });

@@ -218,7 +218,7 @@ export function ApiKeyModal({ isOpen, onClose, onSubmit }: ApiKeyModalProps) {
           </div>
 
           <p className="text-xs text-muted-foreground/50 text-center pt-1">
-            Stored locally · never sent to our servers
+            Stored locally and sent only when validating or generating
           </p>
         </form>
       </DialogContent>

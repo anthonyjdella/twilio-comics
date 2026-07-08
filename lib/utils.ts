@@ -5,9 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const TOGETHER_LINK =
-  "https://togetherai.link/?utm_source=make-comics&utm_medium=referral&utm_campaign=example-app";
-
 export const OPENAI_LINK = "https://platform.openai.com/api-keys";
 
 export function isContentPolicyViolation(errorMessage: string): boolean {

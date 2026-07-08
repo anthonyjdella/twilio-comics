@@ -1,19 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import Together from "together-ai";
 import { auth } from "@clerk/nextjs/server";
 import {
   updatePage,
-  updateStory,
-  createStory,
   createPage,
   getNextPageNumber,
   getStoryById,
   getLastPageImage,
   deletePage,
-  deleteStory,
 } from "@/lib/db-actions";
 import { freeTierRateLimit } from "@/lib/rate-limit";
-import { COMIC_STYLES } from "@/lib/constants";
 import { uploadBufferToS3 } from "@/lib/s3-upload";
 import { buildComicPrompt } from "@/lib/prompt";
 import { generateComicImage } from "@/lib/image-generation";
@@ -22,8 +17,6 @@ import {
   getContentPolicyErrorMessage,
 } from "@/lib/utils";
 import { createComicStory, ComicServiceError } from "@/lib/comic-service";
-
-const TEXT_MODEL = "Qwen/Qwen3.5-9B";
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +53,7 @@ export async function POST(request: NextRequest) {
         const result = await createComicStory({
           userId,
           prompt,
+          apiKey,
           style,
           characterImageUrls: characterImages,
           source: "web",
@@ -102,70 +96,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine which API key to use
-    let finalApiKey = apiKey;
-    const isUsingFreeTier = !apiKey;
-    const usesOwnApiKey = !!apiKey;
-
-    if (isUsingFreeTier) {
-      // Use default API key for free tier
-      finalApiKey = process.env.TOGETHER_API_KEY;
-      if (!finalApiKey) {
-        return NextResponse.json(
-          {
-            error: "Server configuration error - default API key not available",
-          },
-          { status: 500 },
-        );
-      }
+    const openAIApiKey = apiKey || process.env.OPENAI_API_KEY;
+    if (!openAIApiKey) {
+      return NextResponse.json(
+        { error: "Server configuration error - OpenAI API key not available" },
+        { status: 500 },
+      );
     }
 
-    let page;
-    let story;
     let referenceImages: string[] = [];
 
-    if (storyId) {
-      // Continuation: get previous page image and story character images
-      story = await getStoryById(storyId);
-      if (!story) {
-        return NextResponse.json({ error: "Story not found" }, { status: 404 });
+    // Continuation: get previous page image and story character images.
+    const story = await getStoryById(storyId);
+    if (!story) {
+      return NextResponse.json({ error: "Story not found" }, { status: 404 });
+    }
+    if (story.userId !== userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const nextPageNumber = await getNextPageNumber(storyId);
+    const page = await createPage({
+      storyId,
+      pageNumber: nextPageNumber,
+      prompt,
+      characterImageUrls: characterImages,
+    });
+
+    // Get previous page image for style consistency (unless it's page 1)
+    if (nextPageNumber > 1) {
+      const lastPageImage = await getLastPageImage(storyId);
+      if (lastPageImage) {
+        referenceImages.push(lastPageImage);
       }
-
-      const nextPageNumber = await getNextPageNumber(storyId);
-      page = await createPage({
-        storyId,
-        pageNumber: nextPageNumber,
-        prompt,
-        characterImageUrls: characterImages,
-      });
-
-      // Get previous page image for style consistency (unless it's page 1)
-      if (nextPageNumber > 1) {
-        const lastPageImage = await getLastPageImage(storyId);
-        if (lastPageImage) {
-          referenceImages.push(lastPageImage);
-        }
-      }
-
-      // For continuation pages, character images are sent from frontend
-      // No need to fetch separately - frontend handles selection
-    } else {
-      // New story: no previous page reference
-      // Create story with temporary title, will update with generated title
-      story = await createStory({
-        title: prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt,
-        description: undefined,
-        userId: userId,
-        style,
-        usesOwnApiKey,
-      });
-
-      page = await createPage({
-        storyId: story.id,
-        pageNumber: 1,
-        prompt,
-        characterImageUrls: characterImages,
-      });
     }
 
     // Use only the character images sent from the frontend
@@ -173,96 +136,11 @@ export async function POST(request: NextRequest) {
 
     const fullPrompt = buildComicPrompt({
       prompt,
-      style,
+      style: story.style,
       characterImages,
       isContinuation,
       previousContext,
     });
-
-    const client = new Together({ apiKey: finalApiKey });
-
-    // Generate title and description in parallel with image generation (only for new stories)
-    let titleGenerationPromise: Promise<{
-      title: string;
-      description: string;
-    }> | null = null;
-    if (!storyId) {
-      titleGenerationPromise = (async () => {
-        try {
-          const titlePrompt = `Based on this comic book prompt, generate a compelling title and description for the comic book.
-
-Prompt: "${prompt}"
-Style: ${COMIC_STYLES.find((s) => s.id === style)?.name || style}
-
-Generate:
-1. A catchy, engaging title (maximum 60 characters)
-2. A brief description (2-3 sentences, maximum 200 characters)
-
-Format your response as JSON:
-{
-  "title": "Title here",
-  "description": "Description here"
-}
-
-Only return the JSON, no other text.`;
-
-          const textResponse = await client.chat.completions.create({
-            model: TEXT_MODEL,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a creative assistant that generates compelling comic book titles and descriptions. Always respond with valid JSON only.",
-              },
-              {
-                role: "user",
-                content: titlePrompt,
-              },
-            ],
-            temperature: 0.8,
-            max_tokens: 300,
-          });
-
-          const content = textResponse.choices[0]?.message?.content?.trim();
-          if (!content) {
-            throw new Error("No response from text generation");
-          }
-
-          // Extract JSON from response (in case there's extra text)
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) {
-            throw new Error("No JSON found in response");
-          }
-
-          const parsed = JSON.parse(jsonMatch[0]);
-          const rawTitle =
-            parsed.title?.trim() ||
-            (prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt);
-          const rawDescription = parsed.description?.trim();
-
-          // Enforce character limits
-          const title =
-            rawTitle.length > 60 ? rawTitle.substring(0, 57) + "..." : rawTitle;
-          const description =
-            rawDescription && rawDescription.length > 200
-              ? rawDescription.substring(0, 197) + "..."
-              : rawDescription;
-
-          return {
-            title,
-            description: description || undefined,
-          };
-        } catch (error) {
-          console.error("Error generating title and description:", error);
-          // Fallback to prompt-based title
-          return {
-            title:
-              prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt,
-            description: undefined,
-          };
-        }
-      })();
-    }
 
     let imageBuffer: Buffer;
     try {
@@ -273,7 +151,7 @@ Only return the JSON, no other text.`;
       });
       const startTime = Date.now();
       imageBuffer = await generateComicImage({
-        apiKey: process.env.OPENAI_API_KEY!,
+        apiKey: openAIApiKey,
         prompt: fullPrompt,
         referenceImageUrls: referenceImages,
       });
@@ -286,13 +164,7 @@ Only return the JSON, no other text.`;
 
       // Clean up DB records if generation failed
       try {
-        if (!storyId) {
-          // New story failed
-          await deleteStory(story!.id);
-        } else {
-          // Continuation failed
-          await deletePage(page.id);
-        }
+        await deletePage(page.id);
       } catch (cleanupError) {
         console.error(
           "Error cleaning up DB on image generation failure:",
@@ -346,36 +218,10 @@ Only return the JSON, no other text.`;
     }
 
     // Upload generated bytes to S3 for permanent storage
-    const s3Key = `${storyId || story!.id}/page-${
+    const s3Key = `${story.id}/page-${
       page.pageNumber
     }-${Date.now()}.png`;
     const s3ImageUrl = await uploadBufferToS3(imageBuffer, s3Key, "image/png");
-
-    // Wait for title/description generation if it's a new story
-    let generatedTitle: string | undefined;
-    let generatedDescription: string | undefined;
-    if (titleGenerationPromise) {
-      const titleData = await titleGenerationPromise;
-      generatedTitle = titleData.title;
-      generatedDescription = titleData.description;
-
-      // Update story with generated title and description
-      try {
-        await updateStory(story!.id, {
-          title: generatedTitle,
-          description: generatedDescription,
-        });
-        // Update story object for response
-        story = {
-          ...story,
-          title: generatedTitle,
-          description: generatedDescription,
-        };
-      } catch (dbError) {
-        console.error("Error updating story title/description:", dbError);
-        // Continue even if update fails
-      }
-    }
 
     // Update page in database with S3 URL
     try {
@@ -388,30 +234,23 @@ Only return the JSON, no other text.`;
       );
     }
 
-    // Apply rate limiting after successful generation (always server-funded)
-    try {
-      await freeTierRateLimit.limit(userId);
-    } catch (rateLimitError) {
-      console.error(
-        "Error applying rate limit after successful generation:",
-        rateLimitError,
-      );
-      // Don't fail the request if rate limiting fails, just log it
+    if (!apiKey) {
+      try {
+        await freeTierRateLimit.limit(userId);
+      } catch (rateLimitError) {
+        console.error(
+          "Error applying rate limit after successful generation:",
+          rateLimitError,
+        );
+        // Don't fail the request if rate limiting fails, just log it
+      }
     }
 
-    const responseData = storyId
-      ? { imageUrl: s3ImageUrl, pageId: page.id, pageNumber: page.pageNumber }
-      : {
-          imageUrl: s3ImageUrl,
-          storyId: story!.id,
-          storySlug: story!.slug,
-          pageId: page.id,
-          pageNumber: page.pageNumber,
-          title: generatedTitle || story!.title,
-          description: generatedDescription || story!.description,
-        };
-
-    return NextResponse.json(responseData);
+    return NextResponse.json({
+      imageUrl: s3ImageUrl,
+      pageId: page.id,
+      pageNumber: page.pageNumber,
+    });
   } catch (error) {
     console.error("Error in generate-comic API:", error);
     return NextResponse.json(

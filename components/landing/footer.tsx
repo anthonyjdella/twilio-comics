@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TOGETHER_LINK } from "@/lib/utils";
+import { OPENAI_LINK } from "@/lib/utils";
 import { MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { FeedbackModal } from "@/components/feedback-modal";
@@ -32,12 +32,12 @@ export function Footer() {
           <span>
             Made & powered by{" "}
             <Link
-              href={TOGETHER_LINK}
+              href={OPENAI_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white transition-colors text-white"
             >
-              Together.ai
+              OpenAI
             </Link>
           </span>
         </div>

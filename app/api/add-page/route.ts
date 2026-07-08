@@ -23,6 +23,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
+    const apiKey = request.headers.get("x-api-key") || undefined;
 
     if (!userId) {
       return NextResponse.json(
@@ -42,6 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Missing required fields: storyId and prompt" },
         { status: 400 },
+      );
+    }
+
+    const openAIApiKey = apiKey || process.env.OPENAI_API_KEY;
+    if (!openAIApiKey) {
+      return NextResponse.json(
+        { error: "Server configuration error - OpenAI API key not available" },
+        { status: 500 },
       );
     }
 
@@ -137,7 +146,7 @@ export async function POST(request: NextRequest) {
       });
       const startTime = Date.now();
       imageBuffer = await generateComicImage({
-        apiKey: process.env.OPENAI_API_KEY!,
+        apiKey: openAIApiKey,
         prompt: fullPrompt,
         referenceImageUrls: referenceImages,
       });
@@ -211,15 +220,16 @@ export async function POST(request: NextRequest) {
 
     await updatePage(page.id, s3ImageUrl);
 
-    // Apply rate limiting after successful generation (always server-funded)
-    try {
-      await freeTierRateLimit.limit(userId);
-    } catch (rateLimitError) {
-      console.error(
-        "Error applying rate limit after successful generation:",
-        rateLimitError,
-      );
-      // Don't fail the request if rate limiting fails, just log it
+    if (!apiKey) {
+      try {
+        await freeTierRateLimit.limit(userId);
+      } catch (rateLimitError) {
+        console.error(
+          "Error applying rate limit after successful generation:",
+          rateLimitError,
+        );
+        // Don't fail the request if rate limiting fails, just log it
+      }
     }
 
     return NextResponse.json({

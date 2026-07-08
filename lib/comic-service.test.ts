@@ -26,6 +26,7 @@ import { createComicStory, ComicServiceError } from "@/lib/comic-service";
 
 beforeEach(() => {
   Object.values(h).forEach((f) => f.mockReset());
+  process.env.OPENAI_API_KEY = "test-openai-key";
   h.createStory.mockResolvedValue({ id: "s1", slug: "hero-abcd", title: "temp", description: null });
   h.createPage.mockResolvedValue({ id: "p1", pageNumber: 1 });
   h.generateComicImage.mockResolvedValue(Buffer.from("png"));
@@ -59,6 +60,19 @@ describe("createComicStory", () => {
       characterImageUrls: ["https://s3/a.png"],
     });
     expect(h.generateComicImage.mock.calls[0][0].referenceImageUrls).toEqual(["https://s3/a.png"]);
+  });
+
+  it("uses a provided OpenAI key and skips server-funded rate limiting", async () => {
+    await createComicStory({
+      userId: "u1",
+      prompt: "x",
+      source: "web",
+      generateTitle: false,
+      apiKey: "user-openai-key",
+    });
+
+    expect(h.generateComicImage.mock.calls[0][0].apiKey).toBe("user-openai-key");
+    expect(h.limit).not.toHaveBeenCalled();
   });
 
   it("deletes the story and throws content_policy on a policy violation", async () => {

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This app features AI generation of comic books using AI Image models with user references being included in the final outputs making it possible to create custom comic books with different styles and with real characters in them. It uses Together AI inference to run these AI models in this Next.js app.
+This app features AI generation of comic books using OpenAI image models with user references being included in the final outputs, making it possible to create custom comic books with different styles and real characters in them.
 
 ## Commands
 - `pnpm dev` - Start development server
@@ -15,7 +15,7 @@ Never execute this command always consider the "dev" server as already running, 
 - **Auth**: Clerk (`@clerk/nextjs`)
 - **Database**: Neon Postgres with Drizzle ORM (`lib/schema.ts`, `lib/db.ts`)
 - **Storage**: AWS S3 for images (`lib/s3-upload.ts`)
-- **AI**: Together AI for comic generation (`together-ai`)
+- **AI**: OpenAI for image generation and title/description generation (`openai`)
 - **Rate Limiting**: Upstash Redis (`lib/rate-limit.ts`)
 - **UI**: Radix primitives + shadcn/ui (`components/ui/`), Tailwind CSS v4
 

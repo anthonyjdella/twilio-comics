@@ -1,5 +1,7 @@
 # Phase B: Twilio SMS/MMS Channel — Implementation Plan
 
+> Current status note: this is a historical implementation plan. The current app has since removed the previous secondary AI provider entirely; title/description generation now uses `lib/title-generation.ts` with OpenAI, and only OpenAI keys are required for AI generation.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a user create a comic entirely over SMS/MMS — text their name + story prompt (optionally an MMS photo), get the finished comic page delivered back as an MMS image plus a link to the web story page.
@@ -206,7 +208,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   Consumed by the web route (this task) and the QStash worker (Task 8).
 
 **Design notes:**
-- This extracts the "new story, page 1" path from `generate-comic/route.ts` — story creation, prompt build, image generation (server key), S3 upload, title/description generation (keep the existing Together/Qwen title logic, gated by `generateTitle`), rate-limit application (unconditional, keyed by `userId`), and DB cleanup on failure.
+- This extracts the "new story, page 1" path from `generate-comic/route.ts` — story creation, prompt build, image generation (server key), S3 upload, OpenAI title/description generation gated by `generateTitle`, rate-limit application (unconditional, keyed by `userId`), and DB cleanup on failure.
 - It throws typed errors (a small `ComicServiceError` class) instead of returning `NextResponse`, so both an HTTP route and a background worker can map them to their own output (JSON vs. SMS copy).
 - Title generation failure must NOT fail the whole request (existing behavior: falls back to a prompt-derived title).
 
@@ -317,9 +319,9 @@ import {
 } from "./db-actions";
 import { freeTierRateLimit } from "./rate-limit";
 import { isContentPolicyViolation } from "./utils";
-import Together from "together-ai";
+import OpenAI from "openai";
 
-const TEXT_MODEL = "Qwen/Qwen3.5-9B";
+const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4.1-mini";
 
 export class ComicServiceError extends Error {
   type: "content_policy" | "credit_limit" | "api_error";
@@ -349,7 +351,7 @@ export interface CreateComicResult {
 async function generateTitleAndDescription(prompt: string, style: string) {
   try {
     const styleName = COMIC_STYLES.find((s) => s.id === style)?.name || style;
-    const client = new Together({ apiKey: process.env.TOGETHER_API_KEY });
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const titlePrompt = `Based on this comic book prompt, generate a compelling title and description for the comic book.\n\nPrompt: "${prompt}"\nStyle: ${styleName}\n\nGenerate:\n1. A catchy, engaging title (maximum 60 characters)\n2. A brief description (2-3 sentences, maximum 200 characters)\n\nFormat your response as JSON:\n{\n  "title": "Title here",\n  "description": "Description here"\n}\n\nOnly return the JSON, no other text.`;
     const textResponse = await client.chat.completions.create({
       model: TEXT_MODEL,

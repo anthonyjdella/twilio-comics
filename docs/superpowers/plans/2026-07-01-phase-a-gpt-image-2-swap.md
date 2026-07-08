@@ -1,10 +1,12 @@
 # Phase A: GPT Image 2 Swap — Implementation Plan
 
+> Current status note: this is a historical implementation plan. The current app has since consolidated all AI generation onto OpenAI; title/description generation now uses `lib/title-generation.ts`, and the previous secondary AI provider is no longer part of the runtime or env setup.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace Together AI image generation with OpenAI `gpt-image-2` across the web comic-creation flow, preserving consistent-character-face behavior via reference images.
+**Goal:** Replace the previous image provider with OpenAI `gpt-image-2` across the web comic-creation flow, preserving consistent-character-face behavior via reference images.
 
-**Architecture:** Extract a single channel-agnostic image module (`lib/image-generation.ts`) that branches between OpenAI's text-only `images.generate()` (no references) and `images.edit()` (with 1–3 reference images). It returns raw image bytes; a new `uploadBufferToS3` persists them. The two web API routes (`generate-comic`, `add-page`) and the API-key validator are re-pointed from Together to OpenAI with no change to their external contracts.
+**Architecture:** Extract a single channel-agnostic image module (`lib/image-generation.ts`) that branches between OpenAI's text-only `images.generate()` (no references) and `images.edit()` (with 1–3 reference images). It returns raw image bytes; a new `uploadBufferToS3` persists them. The two web API routes (`generate-comic`, `add-page`) and the API-key validator are re-pointed to OpenAI with no change to their external contracts.
 
 **Tech Stack:** Next.js 16 (App Router), TypeScript, `openai` npm SDK, AWS S3 (`@aws-sdk/client-s3`), Drizzle/Neon (unchanged this phase), Vitest (new, for unit tests).
 
@@ -34,9 +36,9 @@
 | `lib/image-generation.test.ts` | Unit tests (mocked OpenAI) for the branch + decode + error mapping | Create |
 | `lib/s3-upload.ts` | Add `uploadBufferToS3(buffer, key, contentType)`; keep `uploadImageToS3` | Modify |
 | `lib/utils.ts` | Extend `isContentPolicyViolation` with OpenAI moderation strings | Modify |
-| `app/api/generate-comic/route.ts` | Call `generateComicImage` instead of Together; upload buffer | Modify |
+| `app/api/generate-comic/route.ts` | Call `generateComicImage`; upload buffer | Modify |
 | `app/api/add-page/route.ts` | Same swap for continuation/redraw | Modify |
-| `app/api/validate-api-key/route.ts` | Validate an OpenAI key instead of a Together key | Modify |
+| `app/api/validate-api-key/route.ts` | Validate an OpenAI key | Modify |
 | `.example.env`, `README.md` | Add `OPENAI_API_KEY`; document model swap | Modify |
 
 **Scope note (deliberate, from spec D1):** The spec proposes a `lib/comic-service.ts` orchestration extraction shared by web/SMS/voice. Phase A has only the *web* caller, so it extracts just the risky/duplicated part — the image call — into `lib/image-generation.ts`. The full orchestration extraction is deferred to **Phase B (SMS)**, when a genuine second caller exists. This is a conscious YAGNI decision, not a dropped requirement.
@@ -393,7 +395,7 @@ import { describe, it, expect } from "vitest";
 import { isContentPolicyViolation } from "@/lib/utils";
 
 describe("isContentPolicyViolation", () => {
-  it("matches existing Together phrasing", () => {
+  it("matches legacy provider phrasing", () => {
     expect(isContentPolicyViolation("Invalid content detected")).toBe(true);
     expect(isContentPolicyViolation("NO_IMAGE")).toBe(true);
   });
@@ -456,18 +458,18 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Modify: `app/api/generate-comic/route.ts`
 
 **Interfaces:**
-- Consumes: `generateComicImage` (Task 2), `uploadBufferToS3` (Task 3), `isContentPolicyViolation` (Task 4). Keeps using Together only for the title/description text call (spec D7).
+- Consumes: `generateComicImage` (Task 2), `uploadBufferToS3` (Task 3), `isContentPolicyViolation` (Task 4), and OpenAI title/description generation.
 - Produces: unchanged HTTP response shape.
 
 > This is a modify-in-place task with no unit test (it's an integration route; verified via build + manual run in Task 7). Make each edit exactly as written.
 
-- [ ] **Step 1: Update imports and remove Together image constants**
+- [ ] **Step 1: Update imports and remove legacy image constants**
 
-Replace the top import of Together and the model/dimension constants. Change line 2 from:
+Replace the top provider import and the model/dimension constants. Change line 2 from:
 ```ts
-import Together from "together-ai";
+import OpenAI from "openai";
 ```
-to keep Together (still used for text) but add the new imports. After the existing `import { buildComicPrompt } from "@/lib/prompt";` line, add:
+to keep text generation on OpenAI and add the new imports. After the existing `import { buildComicPrompt } from "@/lib/prompt";` line, add:
 ```ts
 import { generateComicImage } from "@/lib/image-generation";
 import { uploadBufferToS3 } from "@/lib/s3-upload";
@@ -483,11 +485,11 @@ const FIXED_DIMENSIONS = NEW_MODEL
   ? { width: 896, height: 1200 }
   : { width: 864, height: 1184 };
 ```
-Keep `const TEXT_MODEL = "Qwen/Qwen3.5-9B";` (still used for the title call).
+Keep `const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4.1-mini";` (used for the title call).
 
-- [ ] **Step 2: Keep the Together client for text, and remove the `dimensions` variable**
+- [ ] **Step 2: Keep the text client, and remove the `dimensions` variable**
 
-The title-generation block uses `const client = new Together({ apiKey: finalApiKey });` — keep that client; it is still used for `client.chat.completions.create` (title). Delete the now-unused line:
+The title-generation block uses an OpenAI text client for `client.chat.completions.create` (title). Delete the now-unused line:
 ```ts
     const dimensions = FIXED_DIMENSIONS;
 ```
@@ -551,12 +553,12 @@ with:
     const s3ImageUrl = await uploadBufferToS3(imageBuffer, s3Key, "image/png");
 ```
 
-- [ ] **Step 5: Fix the 402 credit-limit error message (Together → OpenAI)**
+- [ ] **Step 5: Fix the 402 credit-limit error message**
 
-Replace the Together-specific billing message:
+Replace the old provider-specific billing message:
 ```ts
               error:
-                "Insufficient API credits. Please add credits to your Together.ai account at https://api.together.ai/settings/billing or update your API key.",
+                "Insufficient API credits. Please add credits to your OpenAI account at https://platform.openai.com/account/billing or update your API key.",
 ```
 with:
 ```ts
@@ -586,14 +588,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Modify: `app/api/add-page/route.ts`
 
 **Interfaces:**
-- Consumes: `generateComicImage` (Task 2), `uploadBufferToS3` (Task 3). This route does NOT use Together at all after this task (it never did text generation).
+- Consumes: `generateComicImage` (Task 2), `uploadBufferToS3` (Task 3). This route does not do text generation.
 - Produces: unchanged HTTP response shape.
 
-- [ ] **Step 1: Update imports and delete Together constants**
+- [ ] **Step 1: Update imports and delete legacy constants**
 
-Remove the Together import (line 3):
+Remove the old provider import (line 3):
 ```ts
-import Together from "together-ai";
+import OpenAI from "openai";
 ```
 Replace the S3 import line:
 ```ts
@@ -618,16 +620,16 @@ const FIXED_DIMENSIONS = NEW_MODEL
   : { width: 864, height: 1184 };
 ```
 
-- [ ] **Step 2: Remove the `dimensions` var and Together client**
+- [ ] **Step 2: Remove the `dimensions` var and old provider client**
 
 Delete:
 ```ts
     const dimensions = FIXED_DIMENSIONS;
 ```
-Delete the Together client construction:
+Delete the old provider client construction:
 ```ts
-    const client = new Together({
-      apiKey: process.env.TOGETHER_API_KEY,
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
     });
 ```
 
@@ -685,9 +687,9 @@ with:
 - [ ] **Step 5: Verify build + lint**
 
 Run: `pnpm build && pnpm lint`
-Expected: succeeds; no remaining references to `together-ai`, `dimensions`, or `response.data` in this file. Confirm with:
+Expected: succeeds; no remaining references to legacy image-generation imports, `dimensions`, or `response.data` in this file. Confirm with:
 ```bash
-grep -n "together-ai\|dimensions\|response.data\|images.generate" app/api/add-page/route.ts
+grep -n "dimensions\|response.data\|images.generate" app/api/add-page/route.ts
 ```
 Expected: no matches.
 
@@ -761,27 +763,27 @@ Add a line at the top of `.example.env`:
 ```
 OPENAI_API_KEY=
 ```
-Leave `TOGETHER_API_KEY=` in place (still used for title text).
+Leave `OPENAI_API_KEY=` in place for both image and title/description generation.
 
 - [ ] **Step 3: Update the API-key modal copy**
 
 Run first to see current wording:
 ```bash
-grep -n "Together\|together\|api.together\|API key" components/api-key-modal.tsx
+grep -n "API key" components/api-key-modal.tsx
 ```
-Then replace any user-facing "Together"/"Together.ai" references and the key-acquisition link with OpenAI equivalents:
+Then replace any user-facing legacy provider references and the key-acquisition link with OpenAI equivalents:
 - Link → `https://platform.openai.com/api-keys`
 - Wording → "OpenAI API key"
 Only change display strings/links; do not change component logic.
 
 - [ ] **Step 4: Update README**
 
-In `README.md`, update the "How AI Generates Comics" section and the Together AI bullet: comic pages are now generated with **OpenAI `gpt-image-2`** (`images.edit` for character/style consistency, `images.generate` otherwise); Together AI remains only for story titles (Qwen). Add `OPENAI_API_KEY=<your_openai_api_key>` to the env-keys list.
+In `README.md`, update the "How AI Generates Comics" section: comic pages are generated with **OpenAI `gpt-image-2`** (`images.edit` for character/style consistency, `images.generate` otherwise), and titles/descriptions use an OpenAI text model. Add `OPENAI_API_KEY=<your_openai_api_key>` to the env-keys list.
 
 - [ ] **Step 5: Verify build + lint**
 
 Run: `pnpm build && pnpm lint`
-Expected: succeeds. Confirm no user-facing "Together" remains in the api-key modal:
+Expected: succeeds. Confirm no stale provider copy remains in the api-key modal:
 ```bash
 grep -in "together" components/api-key-modal.tsx
 ```
@@ -807,13 +809,13 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Run: `pnpm test`
 Expected: all Vitest tests pass (image-generation, s3-upload, utils).
 
-- [ ] **Step 2: Confirm no stray Together image usage remains**
+- [ ] **Step 2: Confirm no stray legacy image usage remains**
 
 Run:
 ```bash
 grep -rn "images.generate\|reference_images\|FIXED_DIMENSIONS" app lib
 ```
-Expected: no matches (the only `images.generate`/`edit` calls now live inside `lib/image-generation.ts` via the OpenAI client — this grep targets the removed Together patterns).
+Expected: no matches (the only `images.generate`/`edit` calls now live inside `lib/image-generation.ts` via the OpenAI client — this grep targets removed legacy provider patterns).
 
 - [ ] **Step 3: Manual smoke test (requires `OPENAI_API_KEY` set, dev server already running per AGENTS.md)**
 
@@ -841,7 +843,7 @@ Expected: all pass. Phase A complete.
 - BYO key preserved → Tasks 5 (`finalApiKey`), 7. ✔
 - Content-policy mapping for OpenAI → Task 4. ✔
 - `comic-service.ts` (spec D1) → **deliberately deferred to Phase B** (documented in File Structure scope note). ✔
-- Title text stays on Together (spec D7) → Task 5 keeps the Together client for text only. ✔
+- Title text now uses OpenAI through `lib/title-generation.ts`. ✔
 
 **Deferred to later plans (not Phase A):** schema `source`/`conversations` (Phase B), SMS webhook + QStash worker (Phase B), Voice WS service (Phase C). These will each get their own plan.
 

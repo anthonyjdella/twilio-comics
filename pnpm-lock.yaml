@@ -197,9 +197,6 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.3.1)
-      together-ai:
-        specifier: ^0.40.0
-        version: 0.40.0
       twilio:
         specifier: 6.0.2
         version: 6.0.2
@@ -3786,10 +3783,6 @@ packages:
   tinyrainbow@3.1.0:
     resolution: {integrity: sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==}
     engines: {node: '>=14.0.0'}
-
-  together-ai@0.40.0:
-    resolution: {integrity: sha512-7c1YeTTKpvQcDK1k+gN21LEpnbNEmyZfdndeC7aLNtJsIhixAyvvs1eHyhhe6AJecaOP0K0I1vnkEaMBLscRKA==}
-    hasBin: true
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
@@ -7890,8 +7883,6 @@ snapshots:
       picomatch: 4.0.4
 
   tinyrainbow@3.1.0: {}
-
-  together-ai@0.40.0: {}
 
   tslib@2.8.1: {}
 

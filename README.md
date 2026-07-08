@@ -9,7 +9,7 @@
 
 ## How AI Generates Comics
 
-Comic pages are generated with [**OpenAI `gpt-image-2`**](https://platform.openai.com/docs/guides/image-generation): `images.edit` is used when a character reference image or a previous page is available (for visual consistency), and `images.generate` is used otherwise. Story titles and narratives are generated with [**Qwen3 80B**](https://www.together.ai/models/qwen3-next-80b-a3b-instruct) via Together AI.
+Comic pages are generated with [**OpenAI `gpt-image-2`**](https://platform.openai.com/docs/guides/image-generation): `images.edit` is used when a character reference image or a previous page is available (for visual consistency), and `images.generate` is used otherwise. Story titles and descriptions are generated with a separate OpenAI text model.
 The AI references previous pages for visual coherence and uses uploaded character images to maintain consistency across panels.
 
 ## Tech stack
@@ -17,9 +17,8 @@ The AI references previous pages for visual coherence and uses uploaded characte
 - [Next.js 16](https://nextjs.org/) with React 19 and Tailwind CSS
 - [Drizzle ORM](https://orm.drizzle.team/) with [Neon](https://neon.tech) PostgreSQL database
 - [Clerk](https://clerk.com/) for authentication
-- [OpenAI](https://openai.com/) for image generation (`gpt-image-2`)
-- [Together AI](https://together.ai/) for story title/narrative generation (Qwen3 80B)
-- [AWS S3](https://aws.amazon.com/s3/) for image storage
+- [OpenAI](https://openai.com/) for image generation (`gpt-image-2`) and title/description generation
+- [AWS S3](https://aws.amazon.com/s3/) for image storage (current implementation; Azure Blob Storage is a natural future swap for Azure Container Apps)
 - [Upstash Redis](https://upstash.com/) for rate limiting
 - [jsPDF](https://github.com/parallax/jsPDF) for PDF generation
 - [Twilio](https://www.twilio.com/) for SMS/MMS delivery
@@ -55,7 +54,7 @@ The SMS channel uses an **async, webhook-driven design**: the incoming SMS webho
    - From Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
    - From QStash: `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
    - Your public URL: `PUBLIC_BASE_URL`
-   - Plus existing vars: `OPENAI_API_KEY`, `TOGETHER_API_KEY`, S3 credentials, database URL, Clerk keys, etc.
+   - Plus existing vars: `OPENAI_API_KEY`, S3 credentials, database URL, Clerk keys, etc.
 
 7. **Apply the database migration**:
    ```bash
@@ -101,9 +100,9 @@ The phone call channel uses [**Twilio ConversationRelay**](https://www.twilio.co
 1. Clone the repo: `git clone https://github.com/nutlope/make-comics`
 2. Create a `.env` file based on `.example.env` and add your API keys:
    - **OpenAI API key**: `OPENAI_API_KEY=<your_openai_api_key>`
-   - **Together AI API key**: `TOGETHER_API_KEY=<your_together_ai_api_key>`
+   - **OpenAI models**: `OPENAI_IMAGE_MODEL=gpt-image-2`, `OPENAI_TEXT_MODEL=gpt-4.1-mini` (optional; these are the defaults)
    - **AWS S3 credentials**: `S3_UPLOAD_KEY`, `S3_UPLOAD_SECRET`, `S3_UPLOAD_BUCKET`, `S3_UPLOAD_REGION`
    - **Database URL**: Use [Neon](https://neon.tech) to set up your PostgreSQL database: `DATABASE_URL=<your_database_url>`
    - **Clerk keys**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
    - **Upstash Redis**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
-3. Run `npm install` and `npm run dev` to install dependencies and run locally
+3. Run `pnpm install` and `pnpm dev` to install dependencies and run locally

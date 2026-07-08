@@ -1,15 +1,15 @@
 # Design: GPT Image 2 generation + Twilio (SMS & Voice) input channels
 
 **Date:** 2026-07-01
-**Status:** Draft — pending user review
-**Scope:** Replace Together AI image generation with OpenAI `gpt-image-2`, and add Twilio SMS/MMS and Twilio Voice (ConversationRelay) as alternative input channels to the existing web form.
+**Status:** Implemented, then updated 2026-07-07 to remove the previous secondary AI provider entirely.
+**Scope:** Use OpenAI for comic image generation plus title/description generation, and add Twilio SMS/MMS and Twilio Voice (ConversationRelay) as alternative input channels to the existing web form.
 
 ---
 
 ## 1. Goals & non-goals
 
 ### Goals
-- Generate comic pages with OpenAI **`gpt-image-2`** instead of Together AI's `google/flash-image-2.5`, preserving the existing "consistent character faces across panels" behavior that depends on reference images.
+- Generate comic pages with OpenAI **`gpt-image-2`**, preserving the existing "consistent character faces across panels" behavior that depends on reference images.
 - Let users create a comic **without the web UI**, by:
   - **SMS/MMS** — texting their name + story prompt (and optionally a character photo).
   - **Voice call** — a phone conversation (Twilio ConversationRelay) that collects name + story prompt by voice.
@@ -19,16 +19,16 @@
 - No changes to the web editor experience beyond the shared-service refactor.
 - No new comic styles or layout changes.
 - No billing/subscription changes; free-tier rate limiting is reused.
-- No migration of existing Together-generated stories.
+- No migration of existing stories.
 
 ---
 
 ## 2. Current architecture (as-is)
 
 - **Web form** (`components/landing/comic-creation-form.tsx`) collects: `prompt`, `style` (noir/manga/american-modern/vintage), and up to **2 character photos** (uploaded to S3 via `next-s3-upload`).
-- **`POST /api/generate-comic`** (new story, page 1): auth via Clerk → create `story` + `page` rows → build prompt (`lib/prompt.ts`) → `Together.images.generate({ model, prompt, width, height, temperature, reference_images })` → upload result to S3 → generate title/description via Together text model (Qwen) → update rows → apply free-tier rate limit.
+- **`POST /api/generate-comic`** (new story, page 1): auth via Clerk → create `story` + `page` rows → build prompt (`lib/prompt.ts`) → generate image through `lib/image-generation.ts` with OpenAI `images.generate` or `images.edit` → upload result to S3 → generate title/description through `lib/title-generation.ts` with an OpenAI text model → update rows → apply free-tier rate limit.
 - **`POST /api/add-page`** (continuation / redraw): similar, plus it passes the **previous page image** as a reference for style continuity.
-- **Reference images** are the mechanism for character/style consistency: the character photos and previous-page image are passed in Together's `reference_images` array.
+- **Reference images** are the mechanism for character/style consistency: the character photos and previous-page image are passed to OpenAI `images.edit` as input images.
 - **Storage:** Neon Postgres (Drizzle, `lib/schema.ts`): `stories`, `pages`, `feedback`. Images on public S3 (`lib/s3-upload.ts`). Rate limiting on Upstash Redis (`lib/rate-limit.ts`, 3 comics / 7 days). Auth via Clerk (`proxy.ts` middleware).
 
 ### Key constraints discovered (research-grounded)
@@ -51,7 +51,7 @@
 | D4 | **Delivery = MMS image + link to existing web story page** | Reuses the entire existing web viewer/editor/PDF; the image also lands in-thread. *(Recommended default — confirm.)* |
 | D5 | **Phone number (E.164) is the identity** for SMS/Voice stories; Clerk stays web-only | Twilio users have no Clerk account. Natural, low-friction. |
 | D6 | Background generation via **Upstash QStash** enqueue → worker | Already using Upstash; durable + retried; decouples the fast webhook ack from slow work. When the Voice WS service exists, it can host the worker instead. |
-| D7 | Keep **Together for title text** (Qwen) initially | Smaller diff. Optional later consolidation onto an OpenAI text model. |
+| D7 | Use OpenAI for title/description text | Keeps all AI generation on one provider. |
 | D8 | Voice conversation runs on an **in-repo standalone Node WS server** (`voice-server/`) | ConversationRelay needs `wss://`; serverless can't host it. |
 
 ---
@@ -144,7 +144,7 @@ The three existing web routes become thin adapters over this service.
 
 ### 4.7 `/api/validate-api-key` (modify)
 
-Re-point from Together to OpenAI: `new OpenAI({ apiKey })` → a cheap validating call (e.g. `client.models.retrieve("gpt-image-2")` or a tiny models list) → return `{ valid }`. Update the api-key modal copy ("Together" → "OpenAI") and cost hint (~$0.05/comic).
+Validate OpenAI keys with `new OpenAI({ apiKey })` → a cheap validating call (e.g. `client.models.retrieve("gpt-image-2")` or a tiny models list) → return `{ valid }`. Update the api-key modal copy and cost hint (~$0.05/comic).
 
 ---
 
@@ -167,7 +167,7 @@ QStash ──▶ POST /api/twilio/generate-worker (maxDuration 60)
       │     ├─ buildComicPrompt()
       │     ├─ image-generation.generateImage()  ── gpt-image-2 (edit if refs)
       │     ├─ uploadBufferToS3()  → public URL
-      │     └─ title via Together text model
+      │     └─ title/description via OpenAI text model
       │
       └─▶ client.messages.create({ to:phone, mediaUrl:[s3Url], body:"…<link>" })
             → user receives comic page as MMS + web link
@@ -178,8 +178,9 @@ QStash ──▶ POST /api/twilio/generate-worker (maxDuration 60)
 ## 6. Environment variables (additions)
 
 ```
-# OpenAI (replaces Together for images)
 OPENAI_API_KEY=
+OPENAI_IMAGE_MODEL=gpt-image-2
+OPENAI_TEXT_MODEL=gpt-4.1-mini
 
 # Twilio
 TWILIO_ACCOUNT_SID=
@@ -197,8 +198,6 @@ PUBLIC_BASE_URL=                # https origin, for exact-URL sig validation + l
 # Voice (phase 2)
 CONVERSATION_RELAY_WS_URL=      # wss://<voice-host>/relay
 
-# Kept
-TOGETHER_API_KEY=               # title text (Qwen) — optional to retire later
 ```
 Update `.example.env` and `README.md` accordingly.
 
@@ -263,7 +262,7 @@ Each phase is independently shippable and testable.
 - **O1 (build order):** Confirm SMS-first (D3) vs both-together vs voice-first.
 - **O2 (delivery):** Confirm MMS image + link (D4) vs image-only vs link-only. (Link-only avoids some MMS cost/compliance but is less magical.)
 - **O3 (conversation state store):** Postgres `conversations` table (chosen) vs Redis with TTL. Redis is lighter but less auditable.
-- **O4 (title text):** Keep Together/Qwen (D7) or consolidate onto an OpenAI text model to drop the Together dependency entirely?
+- **O4 (title text):** Resolved — use an OpenAI text model.
 - **O5 (styles over SMS):** Ask the texter to pick a style, or default to `noir` and skip the extra turn? (Design assumes default-noir, photo optional, to keep the SMS conversation to 2 turns.)
 - **O6 (BYO key over SMS):** Web users can supply their own OpenAI key. Should SMS/voice users always use the server key (simpler), given they can't paste a key easily? (Design assumes server key for Twilio channels.)
 ```

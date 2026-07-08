@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TOGETHER_LINK } from "@/lib/utils";
+import { OPENAI_LINK } from "@/lib/utils";
 
 export function LandingHero() {
   const [pagesLast24h, setPagesLast24h] = useState<number | null>(null);
@@ -31,7 +31,7 @@ export function LandingHero() {
       <div className="relative z-10">
         <div className="lg:text-left text-center">
           <a
-            href={TOGETHER_LINK}
+            href={OPENAI_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="flex justify-center items-center gap-1 px-2.5 py-1 rounded-full border border-border glass-panel mb-4 sm:mb-6 w-fit"
@@ -39,7 +39,9 @@ export function LandingHero() {
             <span className="text-[10px] font-medium text-muted-foreground tracking-[-0.015em]">
               Powered by
             </span>
-            <img src="/poweredby.png" className="h-[18px]"/>
+            <span className="text-[10px] font-semibold text-white tracking-[-0.015em]">
+              OpenAI
+            </span>
           </a>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-foreground uppercase mb-4 sm:mb-5 tracking-wide font-heading font-semibold leading-tight sm:leading-[5.2rem]">

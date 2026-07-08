@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from "openai";
 
-export const IMAGE_MODEL = "gpt-image-2";
+export const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
 export const IMAGE_SIZE = "1024x1536"; // portrait 2:3 comic page
 export const MAX_REFERENCE_IMAGES = 16;
 
